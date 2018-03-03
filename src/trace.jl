@@ -10,7 +10,7 @@ using ..geometry
 using DifferentialEquations
 
 # Some of setups for the integrator.
-const dt = 5e-2 * AU
+const dt = 1e-1 * AU
 alg = Tsit5()
 const rt=1e-8
 const at=1e-10
@@ -56,8 +56,9 @@ function trace_pixel(xprime, yprime, v0, mol::Molecule, pars::AbstractParameters
 
     rmax = 700.0 * AU
 
-    # Calculate DeltaVmax for the disk, or just set it for now for 1 AU
-    DeltaVmax = sqrt(2 * kB * temperature(1.0*AU, pars)/mol.mol_weight + (pars.ksi * 1e5)^2)
+    # Calculate DeltaVmax for this ray
+    rcyl_min = abs(xprime)
+    DeltaVmax = sqrt(2 * kB * temperature(rcyl_min, pars)/mol.mol_weight + (pars.ksi * 1e5)^2) * 1e-5 # km/s
 
     # Calculate the bounding positions for emission
     # If it's two, just trace it.
@@ -81,8 +82,8 @@ function trace_pixel(xprime, yprime, v0, mol::Molecule, pars::AbstractParameters
 
     prob = ODEProblem(f, u0, tspan, args)
 
-    sol = solve(prob, alg, callback=cb, reltol=rt, abstol=at, dense=false, save_everystep=true, dtmax=8*AU, dt=dt)
-    println(sol)
+    sol = solve(prob, alg, callback=cb, reltol=rt, abstol=at, dense=false, save_everystep=false, dtmax=5*AU, dt=dt)
+    # println(sol)
 
     tau_final, int_final = sol.u[end]
 

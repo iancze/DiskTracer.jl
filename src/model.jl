@@ -311,7 +311,7 @@ function get_grids(pars, mol, nu, nr, rmax, nz, zmax)
 
         # If either of these errored, return a large value for Delta V, and 0.0 for S_nu and Upsilon
         if (ind_r > nr) | (ind_z > nz)
-            return 1.0, 0.0, 0.0
+            return 1.0e5, 0.0, 0.0
         else
             return DeltaV2_grid[ind_z, ind_r], S_nu_grid[ind_z, ind_r], Upsilon_nu_grid[ind_z, ind_r]
         end

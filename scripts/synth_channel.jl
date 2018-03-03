@@ -50,6 +50,8 @@ vs = linspace(-4.0, 4.0, nv)
 
 img = zeros(Float64, npix, npix, nv)
 mask = Array{Bool}(npix, npix, nv)
+mask_height = Array{Bool}(npix, npix, nv)
+
 
 
 tic()
@@ -58,8 +60,13 @@ for k=1:nv
     for j=1:npix
         for i=1:npix
             # verify_pixel(xs[i], ys[j], pars, vs[k], 0.5, 400*AU)
-            yes = verify_pixel(xs[i], ys[j], pars, vs[k], 0.5, 400*AU)
+            # Calculate DeltaVmax for this ray
+            rcyl_min = abs(xs[i])
+            DeltaVmax = sqrt(2 * kB * temperature(rcyl_min, pars)/mol.mol_weight + (pars.ksi * 1e5)^2) * 1e-5 # km/s
+
+            yes = verify_pixel(xs[i], ys[j], pars, vs[k], DeltaVmax, 400*AU)
             mask[j,i,k] = yes
+            mask_height[j,i,k] = verify_pixel_height(xs[i], ys[j], pars, vs[k], DeltaVmax, 400*AU, 0.5)
             if yes
                 img[j,i,k] = trace_pixel(xs[i], ys[j], vs[k], mol, pars, interp)
             end
@@ -69,6 +76,6 @@ end
 toc()
 
 # Save the channel maps and mask
-
 npzwrite("img.npy", img)
 npzwrite("mask.npy", mask)
+npzwrite("mask_height.npy", mask_height)
