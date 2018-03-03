@@ -62,7 +62,10 @@ for k=1:nv
             # verify_pixel(xs[i], ys[j], pars, vs[k], 0.5, 400*AU)
             # Calculate DeltaVmax for this ray
             rcyl_min = abs(xs[i])
-            DeltaVmax = sqrt(2 * kB * temperature(rcyl_min, pars)/mol.mol_weight + (pars.ksi * 1e5)^2) * 1e-5 # km/s
+            DV2_max, junk, junk2 = interp(rcyl_min, 0.0)
+            DeltaVmax = sqrt(DV2_max) * 1e-5 # km/s
+            # println(DeltaVmax)
+            # DeltaVmax = sqrt(2 * kB * temperature(rcyl_min, pars)/mol.mol_weight + (pars.ksi * 1e5)^2) * 1e-5 # km/s
 
             yes = verify_pixel(xs[i], ys[j], pars, vs[k], DeltaVmax, 400*AU)
             mask[j,i,k] = yes

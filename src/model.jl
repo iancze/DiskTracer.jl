@@ -279,7 +279,7 @@ end
 # Because we will always be querying for the same rcyl, z values,
 # Return the three quantities at once.
 
-function get_grids(pars, mol, nu, nr, rmax, nz, zmax)
+function get_grids(pars::AbstractParameters, mol::Molecule, nu::Number, nr::Int, rmax::Number, nz::Int, zmax::Number)
     # Fill out 2D array spaced in zmax, rmax
     rs = linspace(0.0, rmax, nr)
     zs = linspace(0.0, zmax, nz)
@@ -288,13 +288,16 @@ function get_grids(pars, mol, nu, nr, rmax, nz, zmax)
     S_nu_grid = Array{Float64}(nz, nr)
     Upsilon_nu_grid = Array{Float64}(nz, nr)
 
-    # Don't fill out the first r column, since this blows up to infty due to temperature.
-    # Simply copy the second value.
+    # Don't fill out the first r column, since this blows up to infty due to singularities in the temperature and surface
+    # density profiles at the origin (rcyl = 0).
+    # Simply copy the second and third values.
     for i=1:nz
-        DeltaV2_grid[i,1] = DeltaV2(rs[2], zs[i], pars, mol)
-        S_nu_grid[i,1] = S_nu(rs[2], zs[i], nu, pars)
-        Upsilon_nu_grid[i,1] = Upsilon_nu(rs[2], zs[i], nu, pars, mol)
-        for j=2:nr
+        for j=1:10
+            DeltaV2_grid[i,j] = DeltaV2(rs[10], zs[i], pars, mol)
+            S_nu_grid[i,j] = S_nu(rs[10], zs[i], nu, pars)
+            Upsilon_nu_grid[i,j] = Upsilon_nu(rs[10], zs[i], nu, pars, mol)
+        end
+        for j=11:nr
             DeltaV2_grid[i,j] = DeltaV2(rs[j], zs[i], pars, mol)
             S_nu_grid[i,j] = S_nu(rs[j], zs[i], nu, pars)
             Upsilon_nu_grid[i,j] = Upsilon_nu(rs[j], zs[i], nu, pars, mol)
@@ -302,7 +305,7 @@ function get_grids(pars, mol, nu, nr, rmax, nz, zmax)
     end
 
     # Closure which works on this grid.
-    function interp(rcyl, z)
+    function interp(rcyl::Number, z::Number)
         # Look up what index rcyl is in rs
         ind_r = searchsortedfirst(rs, rcyl)
 

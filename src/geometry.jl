@@ -151,8 +151,18 @@ function verify_pixel_height(xprime::Float64, yprime::Float64, pars::AbstractPar
                 return verify_h_bound(xprime, yprime, z1start, z1end, pars, hlim) || verify_h_bound(xprime, yprime, z2start, z2end, pars, hlim)
             end
         end
-    end
+    else
+        # Just get the bounds and evaluate
+        bounds = get_bounding_zps(xprime, yprime, pars, v0, DeltaVmax, rmax)
+        if length(bounds) == 2
+            z1start, z1end = bounds
+            return verify_h_bound(xprime, yprime, z1start, z1end, pars, hlim)
+        else
+            z1start, z1end, z2start, z2end = bounds
+            return verify_h_bound(xprime, yprime, z1start, z1end, pars, hlim) || verify_h_bound(xprime, yprime, z2start, z2end, pars, hlim)
+        end
 
+    end
     println("Reached end?")
 end
 
