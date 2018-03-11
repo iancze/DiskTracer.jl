@@ -57,6 +57,10 @@ function get_coords(zprime::Float64, gcalc::GeoPrecalc)
     return (rcyl, z, vlos)
 end
 
+function get_Delta_v_approx(xprime::Float64, yprime::Float64, zprime::Float64, pars::AbstractParameters, v0::Float64, zmid::Float64)
+    return 3./2 * zmid * (v0 * 1.e5)^(7/3) * (zprime - zmid) / (xprime * sqrt(G * pars.M_star * M_sun) * sind(pars.incl))^(4./3)
+end
+
 
 "Verify whether a given pixel has any any emitting regions. Assumes xprime, yprime, and rmax are in cm. The velocity equivalent to the frequency to be traced is given by v0 [km/s]. DeltaVmax is also in km/s.
 
@@ -164,6 +168,17 @@ function verify_pixel_height(xprime::Float64, yprime::Float64, pars::AbstractPar
 
     end
     println("Reached end?")
+end
+
+"Rather than finding the bounding zps (next), just find the z0 that corresponds to the center of the line, central frequency."
+function get_zps(xprime::Float64, yprime::Float64, pars::AbstractParameters, v0::Float64)
+    @assert (((xprime > 0) & (v0 > 0)) | ((xprime < 0) & (v0 < 0))) "Pixel has no z0 solution due to v0/xprime mismatch (doesn't necessarily mean pixel won't have any emission though, since line-broadening can change this.)"
+
+    @assert (xprime * sqrt(G * pars.M_star * M_sun) * sind(pars.incl) / (v0*1e5))^(4/3) >  (xprime^2 + yprime^2) "Pixel has no z0 solution to due negative sqrt (doesn't necessarily mean pixel won't have any emission though, since line-broadening can change this.)"
+
+    zp = sqrt((xprime  * sqrt(G  * pars.M_star * M_sun) * sind(pars.incl)/(v0*1e5))^(4/3.) - xprime^2 - yprime^2)
+
+    return Float64[zp, -zp]
 end
 
 
@@ -275,6 +290,7 @@ function get_bounding_scale_heights(xprime::Float64, yprime::Float64, pars::Abst
     a = h^2 * sind(pars.incl)^2 - cosd(pars.incl)^2
     b = -2 * yprime * cosd(pars.incl) * sind(pars.incl) * (h^2 + 1)
     c = h^2 * xprime^2 - yprime^2 * (sind(pars.incl)^2 - h^2 * cosd(pars.incl)^2)
+    @assert b^2 - 4 * a * c > 0 "Discriminant is negative."
     sol1 = (-b + sqrt(b^2 - 4 * a * c))/(2 * a)
     sol2 = (-b - sqrt(b^2 - 4 * a * c))/(2 * a)
 

@@ -5,8 +5,11 @@ import PyPlot.plt
 using NPZ
 
 img = npzread("img.npy")
+tau = npzread("tau.npy")
 mask = npzread("mask.npy")
 mask_height = npzread("mask_height.npy")
+
+tau8 = tau .> 8.0
 
 nx, ny, nv = size(img)
 
@@ -22,11 +25,13 @@ println("Fraction of pixels brighter than max * 1e-3, ", sum(above)/(nx * ny * n
 println("Total pixels mask ", sum(mask))
 println("Total pixels mask height ", sum(mask_height))
 
-fig, ax = plt[:subplots](nrows=3, ncols=nv, figsize=(1.5 * nv, 4.5))
+fig, ax = plt[:subplots](nrows=5, ncols=nv, figsize=(1.5 * nv, 8.0))
 for k=1:nv
     ax[1,k][:imshow](img[:,:,k], origin="lower", interpolation="none")
-    ax[2,k][:imshow](mask[:,:,k], origin="lower", interpolation="none")
-    ax[3,k][:imshow](mask_height[:,:,k], origin="lower", interpolation="none")
+    ax[2,k][:imshow](tau[:,:,k], origin="lower", interpolation="none")
+    ax[3,k][:imshow](tau8[:,:,k], origin="lower", interpolation="none")
+    ax[4,k][:imshow](mask[:,:,k], origin="lower", interpolation="none")
+    ax[5,k][:imshow](mask_height[:,:,k], origin="lower", interpolation="none")
 end
 fig[:subplots_adjust](left=0.03, right=0.97, wspace=0.01)
 plt[:savefig]("chmaps.png")

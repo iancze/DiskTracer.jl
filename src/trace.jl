@@ -52,7 +52,7 @@ end
 
 
 "v0 is the central velocity of the channel, relative to the disk systemic velocity."
-function trace_pixel(xprime, yprime, v0, mol::Molecule, pars::AbstractParameters, interp)
+function trace_pixel(xprime, yprime, v0, mol::Molecule, pars::AbstractParameters, interp; get_tau=false)
 
     rmax = 700.0 * AU
 
@@ -98,10 +98,17 @@ function trace_pixel(xprime, yprime, v0, mol::Molecule, pars::AbstractParameters
         sol = solve(prob, alg, callback=cb, reltol=rt, abstol=at, dense=false, save_everystep=false, dtmax=3*AU, dt=dt)
         tau_final, int_final = sol.u[end]
 
-        return int_final
-
+        if get_tau
+            return int_final, tau_final
+        else
+            return int_final
+        end
     else
-        return int_final
+        if get_tau
+            return int_final, tau_final
+        else
+            return int_final
+        end
     end
 
 end

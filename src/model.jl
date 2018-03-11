@@ -166,19 +166,19 @@ end
 # Parametric type T allows passing individual Float64 or Vectors.
 # # Alternate functions accept pars passed around, where pars is in M_star, AU, etc...
 "The Keplerian velocity assuming non-zero thickness to the disk."
-function velocity(r::Float64, z::Float64, M_star::Float64)
+function velocity(r::Real, z::Real, M_star::Real)
     sqrt.(G * M_star / (r^2 + z^2)^(3./2)) * r
 end
 velocity{T}(r::T, z::T, pars::AbstractParameters) = velocity(r, z, pars.M_star * M_sun)
 
 "Calculate temperature in cylindrical coordinates."
-function temperature{T}(r::T, T_10::Float64, q::Float64)
+function temperature{T}(r::T, T_10::Real, q::Real)
     T_10 * (r ./ (10. * AU)).^(-q)
 end
 temperature{T}(r::T, pars::AbstractParameters) = temperature(r, pars.T_10, pars.q)
 
 "Scale height, calculate in cylindrical coordinates."
-function Hp{T}(r::T, M_star::Float64, T_10::Float64, q::Float64)
+function Hp{T}(r::T, M_star::Real, T_10::Real, q::Real)
     temp = temperature(r, T_10, q)
     sqrt.(kB * temp .* r.^3./(mu_gas * m_H * G * M_star))
 end
@@ -186,7 +186,7 @@ Hp{T}(r::T,  pars::AbstractParameters) = Hp(r, pars.M_star * M_sun, pars.T_10, p
 
 
 "Calculate the gas surface density using cylindrical coordinates."
-function Sigma(r::Float64, pars::AbstractParameters)
+function Sigma(r::Real, pars::AbstractParameters)
     r_c = pars.r_c * AU
 
     gamma = pars.gamma
@@ -201,7 +201,7 @@ end
     Sigma(r::Float64, pars::ParametersNuker)
 
 Calculate the gas surface density using the Nuker profile."
-function Sigma(r::Float64, pars::ParametersNuker)
+function Sigma(r::Real, pars::ParametersNuker)
     r_c = pars.r_c * AU
 
     gamma = pars.gamma
@@ -216,7 +216,7 @@ end
 
 
 # Delivers a gas density in g/cm^3
-function rho(r::Float64, z::Float64, pars::AbstractParameters)
+function rho(r::Real, z::Real, pars::AbstractParameters)
     H = Hp(r, pars)
     S = Sigma(r, pars)
 
@@ -228,7 +228,7 @@ end
 
 # Ksi is microturbulent broadining width in units of km/s. Output of this function
 # is in cm/s for RADMC (RADMC manual, eqn 7.12)
-function microturbulence(ksi::Float64)
+function microturbulence(ksi::Real)
     return ksi * 1.e5 # convert from km/s to cm/s
 end
 
@@ -237,7 +237,7 @@ microturbulence(pars::AbstractParameters) = microturbulence(pars.ksi)
 # Calculate the partition function for the temperature
 # uses Mangum and Shirley expansion
 # assumes B0 in Hz, depends on molecule
-function Z_partition(T::Float64, mol::Molecule)
+function Z_partition(T::Real, mol::Molecule)
     nugget = (h * mol.B0) / (kB * T)
     return 1/nugget + 1/3. + 1/15. * nugget + 4 * nugget^2 / 315 + nugget^3 / 315
 end
@@ -303,6 +303,8 @@ function get_grids(pars::AbstractParameters, mol::Molecule, nu::Number, nr::Int,
             Upsilon_nu_grid[i,j] = Upsilon_nu(rs[j], zs[i], nu, pars, mol)
         end
     end
+
+    println("Max upsilon ", maximum(Upsilon_nu_grid) * AU, " /AU")
 
     # Closure which works on this grid.
     function interp(rcyl::Number, z::Number)
