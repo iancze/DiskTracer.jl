@@ -37,7 +37,7 @@ pyplot()
 
 function plot_ray(xprime, yprime)
 
-    v0 = 1.0 # km/s
+    v0 = 2.0 # km/s
 
     # Get a decent estimate of DeltaVmax
     # Calculate DeltaVmax for this ray
@@ -55,10 +55,13 @@ function plot_ray(xprime, yprime)
     Deltavs = Array{Float64}(nzp)
     tildeDeltavs = Array{Float64}(nzp)
     DeltaVs = Array{Float64}(nzp)
+    rhos = Array{Float64}(nzp)
     Us = Array{Float64}(nzp)
     tildeUs = Array{Float64}(nzp)
     Deltas = Array{Float64}(nzp)
     alphas = Array{Float64}(nzp)
+    tildealphas = Array{Float64}(nzp)
+    tildealphasG = Array{Float64}(nzp)
 
     z0s = DiskTracer.geometry.get_zps(xprime, yprime, pars, v0)
     println("z0s ", z0s)
@@ -71,17 +74,42 @@ function plot_ray(xprime, yprime)
 
     # Actually, we want the zprime that corresponds to the midplane crossing
     zprime_midplane = -tand(pars.incl) * yprime
+    # Calculate the rcyl_mid here
 
-    println("rcyl min ", rcyl_min/AU, " zprime_rcyl_min ", zprime_rcyl_min/AU, " zprime_midplane ", zprime_midplane/AU)
+    # Get amplitude at midplane crossing
+    # Corresponds to r_cyl_mid, 0.0
+    r_cyl_mid = sqrt(xprime^2 + (cosd(pars.incl) * yprime + sind(pars.incl) * zprime_midplane)^2)
 
-    # Get scale height at rcyl_min
+    println("rcyl min ", rcyl_min/AU, " zprime_rcyl_min ", zprime_rcyl_min/AU, " zprime_midplane ", zprime_midplane/AU, " rcyl_mid ", r_cyl_mid/AU)
+
+    # Get scale height at rcyl_min (will be an underestimate)
     H_rcyl_min = DiskTracer.model.Hp(rcyl_min, pars)
+    H_rcyl_mid = DiskTracer.model.Hp(r_cyl_mid, pars)
+
 
     # The amplitude of tilde Upsilon is just the value at the midplane
-    Upsilon_amp = DiskTracer.model.Upsilon_nu(rcyl_min, 0.0, mol.nu_0, pars, mol)
+    Upsilon_amp = DiskTracer.model.Upsilon_nu(r_cyl_mid, 0.0, mol.nu_0, pars, mol)
 
     # The sigma of the Gaussian for tilde Upsilon is this lengthened by the inclination
-    Upsilon_sigma = H_rcyl_min / cosd(pars.incl)
+    Upsilon_sigma = H_rcyl_mid / cosd(pars.incl)
+
+    sigma_Upsilon = H_rcyl_mid / cosd(pars.incl)
+    a_Upsilon = DiskTracer.model.Upsilon_nu(r_cyl_mid, 0.0, mol.nu_0, pars, mol) * sqrt(2pi) * sigma_Upsilon
+    mu_Upsilon = zprime_midplane
+
+    DeltaV = sqrt(2 * kB * DiskTracer.model.temperature(rcyl_min, pars)/mol.mol_weight + (pars.ksi * 1e5)^2)
+
+    mu_upsilon1, mu_upsilon2 = z0s
+    sigma_upsilon = DeltaV * sqrt(2)/3 * (xprime * sqrt(G * pars.M_star * M_sun) * sind(pars.incl))^(4./3) / (mu_upsilon1 * (v0 * 1.e5)^(7/3))
+    a_upsilon = sqrt(2pi) * sigma_upsilon
+
+    sigma_c2 = 1/(sigma_Upsilon^(-2) + sigma_upsilon^(-2))
+    mu_c1 = sigma_c2 * (mu_Upsilon/sigma_Upsilon^2 + mu_upsilon1/sigma_upsilon^2)
+    mu_c2 = sigma_c2 * (mu_Upsilon/sigma_Upsilon^2 + mu_upsilon2/sigma_upsilon^2)
+
+    a_alpha1 = a_Upsilon * a_upsilon / (sqrt(2pi) * sqrt(sigma_Upsilon^2 + sigma_upsilon^2)) * exp(- (mu_Upsilon - mu_upsilon1)^2/(2 * (sigma_Upsilon^2 + sigma_upsilon^2)))
+    a_alpha2 = a_Upsilon * a_upsilon / (sqrt(2pi) * sqrt(sigma_Upsilon^2 + sigma_upsilon^2)) * exp(- (mu_Upsilon - mu_upsilon2)^2/(2 * (sigma_Upsilon^2 + sigma_upsilon^2)))
+
 
     for i=1:nzp
         zprime = zps[i]
@@ -106,6 +134,11 @@ function plot_ray(xprime, yprime)
 
         Deltas[i] = exp(-Deltav^2/DeltaV^2)
 
+        # S = DiskTracer.model.Sigma(rcyl, pars)
+        # H = (rcyl)^(0.5 * (3 - pars.q)) * ((10 * AU)^pars.q * kB * pars.T_10 / (mu_gas * m_H * G * pars.M_star * M_sun))^(1/2)
+        # rho = S/(sqrt(2. * pi) * H) * exp(-0.5 * (z/H)^2)
+        #
+        # rhos[i] = rho # DiskTracer.model.rho(rcyl, z, pars)
 
         # Ss[i] = DiskTracer.model.S_nu(rcyl, z, mol.nu_0, pars)
 
@@ -115,8 +148,13 @@ function plot_ray(xprime, yprime)
         # println(Us[i], " ", tildeUs[i])
 
         alphas[i] = Us[i] * exp(-Deltav^2/DeltaV^2)
-        # tilde_alphas[i] =
+        tildealphas[i] = tildeUs[i] * exp(-tildeDeltavs[i]^2 / DeltaVs[i]^2)
 
+        if zprime > 0
+            tildealphasG[i] = a_alpha1 / sqrt(2pi * sigma_c2) * exp(-0.5 * (zprime - mu_c1)^2/sigma_c2)
+        else
+            tildealphasG[i] = a_alpha2 / sqrt(2pi * sigma_c2) * exp(-0.5 * (zprime - mu_c2)^2/sigma_c2)
+        end
     end
 
     # get bounding zps
@@ -146,19 +184,27 @@ function plot_ray(xprime, yprime)
     vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
     vline!((z0s./AU)', line=([:black :black]))
 
-    println(minimum(Us))
-    println(minimum(tildeUs))
-
     p5 = plot(zps./AU, Us, xlabel=L"$z^\prime$", ylabel=L"$\Upsilon$") #, yaxis=(scale=:log10))
+
     p55 = plot(zps./AU, tildeUs, ylabel=L"$\tilde{\Upsilon}$") #, yaxis=(scale=:log10))
     vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
 
+    # p6 = plot(zps./AU, rhos, ylabel=L"$\rho$")
+
     # p45 = plot(zps./AU, DeltaVs, xlabel=L"$z^\prime$", ylabel=L"$\Delta V$")
 
-    p6 = plot(zps./AU, alphas, xlabel=L"$z^\prime$", ylabel=L"$\alpha$")
+    p7 = plot(zps./AU, alphas, xlabel=L"$z^\prime$", ylabel=L"$\alpha$")
     vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
+    plot!(zps./AU, tildealphas, ylabel=L"$\tilde{\alpha}$")
+    plot!(zps./AU, tildealphasG, ylabel=L"$\tilde{\alpha}$")
 
-    p = plot(p1,p2,p3,p4,p5,p55,p6,layout=(7,1), legend=false, size=(800,1200))
+
+    p8 = plot(zps./AU, log10.(alphas) - log10.(tildealphas), ylim=(-2,2)) # ylabel=L"$\alpha/\tilde{\alpha}$")
+    p9 = plot(zps./AU, log10.(alphas) - log10.(tildealphasG), ylim=(-2,2))
+
+    # println(extrema(alphas./tildealphas))
+
+    p = plot(p1,p2,p3,p4,p5,p55,p7,p8,p9, layout=(9,1), legend=false, size=(800,1200))
 
 
     savefig(p, "approx_ray_plot.png")
@@ -166,4 +212,4 @@ function plot_ray(xprime, yprime)
 
 end
 
-plot_ray(100.*AU, 100.0*AU)
+plot_ray(200.*AU, 50.0*AU)
