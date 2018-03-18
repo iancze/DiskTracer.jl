@@ -37,7 +37,7 @@ pyplot()
 
 function plot_ray(xprime, yprime)
 
-    v0 = 2.0 # km/s
+    v0 = 1.0 # km/s
 
     # Get a decent estimate of DeltaVmax
     # Calculate DeltaVmax for this ray
@@ -212,4 +212,4 @@ function plot_ray(xprime, yprime)
 
 end
 
-plot_ray(200.*AU, 50.0*AU)
+plot_ray(100.*AU, -100.0*AU)
