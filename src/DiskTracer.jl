@@ -10,5 +10,6 @@ include("constants.jl")
 include("model.jl")
 include("geometry.jl")
 include("trace.jl")
+include("trace_simple.jl")
 
 end # module

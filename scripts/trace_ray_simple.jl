@@ -20,6 +20,7 @@ config = YAML.load(open(parsed_args["config"]))
 using DiskTracer.model
 using DiskTracer.constants
 using DiskTracer.geometry
+using SpecialFunctions
 
 species = config["species"]
 transition = config["transition"]
@@ -29,6 +30,14 @@ pars = convert_dict(config["parameters"], config["model"])
 
 mol = mols[species*transition]
 
+nr=128
+rmax = 500 * AU
+nz=128
+zmax = 200 * AU
+# Get the interpolator object for this particular setup.
+interp = DiskTracer.model.get_grids(pars, mol, mol.nu_0, nr, rmax, nz, zmax)
+
+
 using LaTeXStrings
 using Plots
 pyplot()
@@ -37,7 +46,7 @@ pyplot()
 
 function plot_ray(xprime, yprime)
 
-    vlos = 1.0 # km/s
+    v0 = 1.0 # km/s
 
     # Get a decent estimate of DeltaVmax
     # Calculate DeltaVmax for this ray
@@ -53,10 +62,12 @@ function plot_ray(xprime, yprime)
     zs = Array{Float64}(nzp)
     Ss = Array{Float64}(nzp)
     Us = Array{Float64}(nzp)
-    Deltavs = Array{Float64}(nzp)
-    DeltaVs = Array{Float64}(nzp)
     Deltas = Array{Float64}(nzp)
     alphas = Array{Float64}(nzp)
+
+    z0s = DiskTracer.geometry.get_zps(xprime, yprime, pars, v0)
+    println("z0s ", z0s)
+
 
     for i=1:nzp
         zprime = zps[i]
@@ -66,24 +77,18 @@ function plot_ray(xprime, yprime)
         rcyls[i] = rcyl
         zs[i] = z
 
-        Ss[i] = DiskTracer.model.S_nu(rcyl, z, mol.nu_0, pars)
-        Us[i] = DiskTracer.model.Upsilon_nu(rcyl, z, mol.nu_0, pars, mol)
-
-        # Calculate Delta v at this position
-        Deltav = vlos * 1e5 - DiskTracer.geometry.get_vlos(xprime, yprime, zprime, pars)
-        Deltavs[i] = Deltav
-
+        Deltav = v0 * 1e5 - DiskTracer.geometry.get_vlos(xprime, yprime, zprime, pars)
         DeltaV = sqrt(2 * kB * DiskTracer.model.temperature(rcyl, pars)/mol.mol_weight + (pars.ksi * 1e5)^2)
-        DeltaVs[i] = DeltaV * 1e-5 # km/s
 
         Deltas[i] = exp(-Deltav^2/DeltaV^2)
 
+        Us[i] = DiskTracer.model.Upsilon_nu(rcyl, z, mol.nu_0, pars, mol)
         alphas[i] = Us[i] * exp(-Deltav^2/DeltaV^2)
 
     end
 
     # get bounding zps
-    zbounds = DiskTracer.geometry.get_bounding_zps(xprime, yprime, pars, vlos, DeltaVmax, rmax)
+    zbounds = DiskTracer.geometry.get_bounding_zps(xprime, yprime, pars, v0, DeltaVmax, rmax)
     if length(zbounds) == 2
         zstart, zend = zbounds
         println("H bound verified merged: ", DiskTracer.geometry.verify_h_bound(xprime, yprime, zstart, zend, pars, 0.5))
@@ -93,43 +98,43 @@ function plot_ray(xprime, yprime)
         println("H bound verified rear-side: ", DiskTracer.geometry.verify_h_bound(xprime, yprime, z2start, z2end, pars, 0.5))
     end
 
-    # hbounds, derivs = DiskTracer.geometry.get_bounding_scale_heights(xprime, yprime, pars, 1.0)
+    # Call the routine that actually traces the ray, and returns zp, tau, and I quantities
+    zpts, sol = DiskTracer.trace.trace_pixel(xprime, yprime, v0, mol, pars, interp)
+    println("end tau, I: ", sol.u[end])
 
-    
+
+    # Also call our custom integrator to get tau
+    zpts_c, tau_c, tot_i = DiskTracer.trace_simple.trace_pixel(xprime, yprime, v0, mol, pars, interp)
+    println("num iterations: ", length(zpts_c))
+    println("tot intensity: ", tot_i)
+    # println("zpts_c: ", zpts_c)
+    # println("tau_c: ", tau_c)
+
+    p1 = plot(zps./AU, Us, xlabel=L"$z^\prime$", ylabel=L"$\Upsilon$") #, yaxis=(scale=:log10))
 
 
-    p1 = plot(zps./AU, rcyls./AU, ylabel=L"$r_\mathrm{cyl}$ [AU]")
+    p2 = plot(zps./AU, alphas, xlabel=L"$z^\prime$", ylabel=L"$\alpha$")
+    # vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
+
+    p3 = plot(zps./AU, alphas, xlabel=L"$z^\prime$", ylabel=L"$\alpha$", yaxis=(scale=:log10))
     vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
 
-    p2 = plot(zps./AU, zs./AU, ylabel=L"$z$ [AU]")
-    vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
 
-    p25 = plot(zps./AU, abs.(zs./rcyls), ylabel=L"$|z|/r_\mathrm{cyl}$", ylims=(0, 3))
-    # vline!((hbounds./AU)', line=([:black :black]))
+    p4 = plot(zpts_c./AU, tau_c, xlim=(200, 400), ylabel=L"$\tau$")
+    plot!(zpts./AU, sol[1,:], xlim=(200, 400), ylabel=L"$\tau$")
 
-    p26 = plot(zps./AU, Deltavs .* 1e-5, ylabel=L"$\Delta v$")
+    # p6 = plot(zpts./AU, sol[2,:], xlim=(-600, 600), ylabel=L"$I$")
+    # p6 = plot(zpts./AU, zpts_inv./AU, xlim=(-600, 600))
 
-    p3 = plot(zps./AU, Ss, ylabel=L"$S_\nu$", yaxis=(scale=:log10))
-    # p3 = plot(zps./AU, Ss, ylabel=L"$S_\nu$")
-    vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
+    # println("final ", sol[2,end])
 
-    p4 = plot(zps./AU, Us, xlabel=L"$z^\prime$", ylabel=L"$\Upsilon$")# , yaxis=(scale=:log10))
-    vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
-
-    p45 = plot(zps./AU, DeltaVs, xlabel=L"$z^\prime$", ylabel=L"$\Delta V$")
-
-    p5 = plot(zps./AU, Deltas, xlabel=L"$z^\prime$", ylabel=L"$\exp(-\Delta v^2/\Delta V^2)$")
-    vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
-
-    p6 = plot(zps./AU, alphas, xlabel=L"$z^\prime$", ylabel=L"$\alpha$")
-    vline!((zbounds./AU)', line=([:red :green :blue :cyan]))
-
-    p = plot(p1,p2,p25,p26,p3,p4,p45,p5,p6,layout=(9,1), legend=false, size=(800,1200))
+    p = plot(p1,p2,p3,p4, layout=(4,1), legend=false, size=(800,1200))
 
 
-    savefig(p, "ray_plot.png")
+    savefig(p, "ray_trace_simple.png")
 
 
 end
 
-plot_ray(100.*AU, 200.0*AU)
+
+plot_ray(100.*AU, -100.0*AU)

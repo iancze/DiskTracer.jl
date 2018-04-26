@@ -44,10 +44,12 @@ interp = DiskTracer.model.get_grids(pars, mol, mol.nu_0, nr, rmax, nz, zmax)
 
 # pick a pixel (xprime, yprime), and trace a full ray through the disk
 
-v0 = 2.0 # km/s
+v0 = 1.0 # km/s
 
 
-I = trace_pixel(100*AU, 80*AU, v0, mol, pars, interp)
+I = trace_pixel(100*AU, -100*AU, v0, mol, pars, interp)
+
+# @btime trace_pixel(100*AU, -100*AU, v0, mol, pars, interp)
 println(I)
 
 quit()
@@ -55,10 +57,15 @@ quit()
 # @profile trace_pixel(100*AU, 80*AU, v0, mol, pars, grids)
 # Profile.print()
 
-DeltaVmax = 0.5 # km/s
 rmax = 600*AU #
 xprime = 100*AU
 yprime = 80*AU
+
+rcyl_min = abs(xprime)
+DV2_max, junk, junk2 = interp(rcyl_min, 0.0)
+DeltaVmax = sqrt(DV2_max) * 1e-5 # km/s
+
+
 z1start, z1end = geometry.get_bounding_zps(xprime, yprime, pars, v0, DeltaVmax, rmax)
 gpre = precalc_geo(xprime, yprime, pars)
 args = (z1start, v0, pars, interp, gpre)
