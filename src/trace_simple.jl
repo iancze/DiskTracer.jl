@@ -58,6 +58,7 @@ function integrate_tau(zstart::Real, v0::Real, pars::AbstractParameters, interp,
         Deltav = v0 * 1.e5 - vlos # get_vlos(xprime, yprime, zprime, pars)
 
         # Look up RT quantities from nearest-neighbor interp.
+        # sfunc is evaluated at the midpoint
         DV2, sfunc, Upsilon = interp(rcyl, z)
 
         # Calculate alpha at new midpoint location
@@ -69,9 +70,13 @@ function integrate_tau(zstart::Real, v0::Real, pars::AbstractParameters, interp,
         # since we have a simple ODE, explicit and implicit techniques are the same.
 
         # Calculate S at the new midpoint location
-        tot_intensity += -exp(-0.5(taus[i] + taus[i-1])) * sfunc * alpha_mps[i] * dzp
+        # tot_intensity += -exp(-0.5(taus[i] + taus[i-1])) * sfunc * alpha_mps[i] * dzp # why is this the most accurate?
+        # tot_intensity += -exp(-taus[i]) * sfunc * alpha_mps[i] * dzp
+        # the reason it wasn't working before is because  sfunc is actually already evaluated at the midpoint.
+        tot_intensity += (exp(-taus[i-1]) - exp(-taus[i])) * sfunc # this is also very accurate
 
-
+        # Update trailing sfuncs
+        # sfunc_ = sfunc
 
         # Query alpha at current z position
         if taus[i] > TAU_THRESH

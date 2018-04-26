@@ -101,7 +101,7 @@ function plot_ray(xprime, yprime)
     # Call the routine that actually traces the ray, and returns zp, tau, and I quantities
     zpts, sol = DiskTracer.trace.trace_pixel(xprime, yprime, v0, mol, pars, interp)
     println("end tau, I: ", sol.u[end])
-
+    println("fancy steps: ", length(zpts))
 
     # Also call our custom integrator to get tau
     zpts_c, tau_c, tot_i = DiskTracer.trace_simple.trace_pixel(xprime, yprime, v0, mol, pars, interp)
